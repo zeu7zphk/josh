@@ -1,0 +1,794 @@
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .main-container {
+            width: 700px;
+            height: 500px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+        
+        .info-section {
+            padding: 16px 20px;
+            font-size: 11px; /* Reduzido para caber em uma linha */
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: -55px; /* Aproximado mais do gráfico */
+            white-space: nowrap; /* Garante que fique em uma linha */
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .info-section a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+        
+        .calendar-icon {
+            width: 16px;
+            height: 16px;
+            color: #60a5fa;
+            flex-shrink: 0; /* Evita que o ícone encolha */
+        }
+
+        /* Estilos para a bolinha pulsante */
+        .pulsing-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #FF4A31;
+            z-index: 10;
+        }
+
+        .pulsing-dot::before,
+        .pulsing-dot::after,
+        .pulsing-dot .ring-3 {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid #FF4A31;
+            animation: wave 4s infinite linear;
+        }
+
+        .pulsing-dot::after {
+            animation-delay: 1.33s;
+        }
+
+        .pulsing-dot .ring-3 {
+            animation-delay: 2.66s;
+        }
+
+        @keyframes wave {
+            0% {
+                width: 8px;
+                height: 8px;
+                opacity: 0.8;
+            }
+            50% {
+                opacity: 0.4;
+            }
+            100% {
+                width: 24px;
+                height: 24px;
+                opacity: 0;
+            }
+        }
+        
+        /* Posicionamento do calendário sobreposto */
+        .calendar-overlay {
+            position: absolute;
+            right: 50px;
+            top: 32px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            background-color: #9FE0DD;
+        }
+        
+        /* Legenda do Hoje alinhada com o calendário - ajustada para não ficar em cima */
+        .hoje-legend {
+            position: absolute;
+            right: 220px; /* Afastado mais para não ficar em cima do calendário */
+            top: 42px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+
+    <div class="main-container">
+        <div class="chart-container" id="salesChart"></div>
+        
+        <!-- Legenda "Hoje" alinhada com o calendário -->
+        <div class="hoje-legend">
+            <div style="width: 30px; height: 3px; background-color: #FF4A31;"></div>
+            <span style="font-size: 13px; color: #666;">Hoje</span>
+        </div>
+        
+        <!-- Calendário sobreposto ao gráfico -->
+        <div class="calendar-overlay">
+            <div class="legend-line"></div>
+            
+            <!-- Compact calendar -->
+            <div class="compact-calendar">
+              <style>
+                .compact-calendar *{box-sizing:border-box}
+                .compact-calendar{font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif; display:inline-block}
+
+                /* wrapper reduzido */
+                .cc-wrap{
+                  display:flex;
+                  align-items:center;
+                  gap:2px;
+                  position:relative;
+                  background:transparent;
+                  padding:0;
+                  border-radius:0;
+                  box-shadow:none;
+                  border:0;
+                  color:#333;
+                  width:auto;
+                }
+
+                /* DATA */
+                .cc-date{
+                  min-width:72px;
+                  text-align:left;
+                  font-weight:600;
+                  font-size:14px;
+                  color:#2d3748;
+                  padding:0 4px;
+                  border-radius:4px;
+                  background:transparent;
+                  line-height:1;
+                  display:inline-block;
+                  cursor:pointer;
+                  user-select:none;
+                }
+                .cc-date:active{transform:translateY(1px)}
+
+                /* ÍCONE */
+                .cc-icon{
+                  width:34px;
+                  height:34px;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  cursor:pointer;
+                  border-radius:6px;
+                  background:transparent;
+                  transition:all .12s;
+                  border:1px solid transparent;
+                  padding:4px;
+                }
+                .cc-icon:hover{ transform:translateY(-1px); background:#f6f9ff }
+                .cc-icon svg{ width:18px; height:18px; fill:#5a67d8 }
+
+                /* CALENDÁRIO */
+                .cc-calendar{
+                  position:absolute;
+                  top:44px;
+                  left:0;
+                  background:#fff;
+                  padding:8px;
+                  width:220px;
+                  height:220px;
+                  border-radius:0;
+                  border:1px solid #e1e5e9;
+                  box-shadow:0 14px 40px rgba(15,23,42,.12);
+                  z-index:1000;
+                  display:none;
+                  overflow:hidden;
+                }
+                .cc-header{
+                  display:flex;
+                  align-items:center;
+                  justify-content:space-between;
+                  gap:8px;
+                  font-size:13px;
+                  color:#2d3748;
+                  font-weight:700;
+                  padding-bottom:6px;
+                  border-bottom:1px solid #edf2f7;
+                  margin-bottom:6px;
+                }
+                .cc-nav{display:flex;gap:6px;align-items:center}
+                .cc-nav button{
+                  border:0;background:transparent;padding:4px;border-radius:4px;cursor:pointer;
+                }
+                .cc-nav button:hover{background:#f3f6fb}
+                .cc-days-head{display:grid;grid-template-columns:repeat(7,1fr);font-size:10px;color:#718096;font-weight:700;margin-bottom:6px;text-align:center}
+                .cc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+                .cc-day{
+                  height:22px;display:flex;align-items:center;justify-content:center;border-radius:4px;
+                  font-size:12px;font-weight:600;cursor:pointer;transition:all .08s;
+                }
+                .cc-day:hover{background:#f0f5ff;color:#5a67d8}
+                .cc-selected{background:#5a67d8;color:#fff}
+                .cc-today{background:#ee4d2d;color:#fff;font-weight:800}
+                .cc-other{opacity:.35;pointer-events:none}
+              </style>
+
+              <div class="cc-wrap" id="ccWrap">
+                <div class="cc-date" id="ccSelectedDate" aria-label="Data selecionada">00/00/0000</div>
+
+                <div class="cc-icon" id="ccOpenBtn" title="Abrir calendário" aria-expanded="false" role="button" tabindex="0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                    <path d="M11.5156954,1 C11.7918378,1 12.0156954,1.22385763 12.0156954,1.5 L12.015,2 L14,2 C14.5522847,2 15,2.44771525 15,3 L15,14 C15,14.5522847 14.5522847,15 14,15 L2,15 C1.44771525,15 1,14.5522847 1,14 L1,3 C1,2.44771525 1.44771525,2 2,2 L3.991,2 L3.99143991,1.5 C3.99143991,1.22385763 4.21529754,1 4.49143991,1 C4.76758229,1 4.99143991,1.22385763 4.99143991,1.5 L4.991,2 L11.015,2 L11.0156954,1.5 C11.0156954,1.22385763 11.239553,1 11.5156954,1 Z M14,6 L2,6 L2,14 L14,14 L14,6 Z M5.5,11 C5.77614237,11 6,11.2238576 6,11.5 C6,11.7761424 5.77614237,12 5.5,12 L4.5,12 C4.22385763,12 4,11.7761424 4,11.5 C4,11.2238576 4.22385763,11 4.5,11 Z M8.5,11 C8.77614237,11 9,11.2238576 9,11.5 C9,11.7761424 8.77614237,12 8.5,12 L7.5,12 C7.22385763,12 7,11.7761424 7,11.5 C7,11.2238576 7.22385763,11 7.5,11 L8.5,11 Z M11.5,11 C11.7761424,11 12,11.2238576 12,11.5 C12,11.7761424 11.7761424,12 11.5,12 L10.5,12 C10.2238576,12 10,11.7761424 10,11.5 C10,11.2238576 10.2238576,11 10.5,11 L11.5,11 Z M5.5,8 C5.77614237,8 6,8.22385763 6,8.5 C6,8.77614237 5.77614237,9 5.5,9 L4.5,9 C4.22385763,9 4,8.77614237 4,8.5 C4,8.22385763 4.22385763,8 4.5,8 L5.5,8 Z M8.5,8 C8.77614237,8 9,8.22385763 9,8.5 C9,8.77614237 8.77614237,9 8.5,9 L7.5,9 C7.22385763,9 7,8.77614237 7,8.5 C7,8.77614237 7.22385763,8 7.5,8 L8.5,8 Z M11.5,8 C11.7761424,8 12,8.22385763 12,8.5 C12,8.77614237 11.7761424,9 11.5,9 L10.5,9 C10.2238576,9 10,8.77614237 10,8.5 C10,8.77614237 10.2238576,8 10.5,8 L11.5,8 Z M3.991,3 L2,3 L2,5 L14,5 L14,3 L12.015,3 L12.0156954,3.5 C12.0156954,3.77614237 11.7918378,4 11.5156954,4 C11.239553,4 11.0156954,3.77614237 11.0156954,3.5 L11.015,3 L4.991,3 L4.99143991,3.5 C4.99143991,3.77614237 4.76758229,4 4.49143991,4 C4.21529754,4 3.99143991,3.77614237 3.99143991,3.5 L3.991,3 Z"></path>
+                  </svg>
+                </div>
+
+                <div class="cc-calendar" id="ccCalendar" aria-hidden="true"></div>
+              </div>
+
+              <script>
+                (function(){
+                  const meses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+                  const diasSemana = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+                  const ccSelectedDateEl = document.getElementById('ccSelectedDate');
+                  const ccOpenBtn = document.getElementById('ccOpenBtn');
+                  const ccCalendar = document.getElementById('ccCalendar');
+                  const ccWrap = document.getElementById('ccWrap');
+
+                  const hoje = new Date();
+                  let anoAtual = hoje.getFullYear();
+                  let mesAtual = hoje.getMonth();
+                  let dataSelecionada = null;
+
+                  function formatDate(d){
+                    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+                  }
+
+                  function atualizarLabel(){
+                    if (dataSelecionada){
+                      ccSelectedDateEl.textContent = formatDate(dataSelecionada);
+                    } else {
+                      ccSelectedDateEl.textContent = formatDate(hoje);
+                    }
+                  }
+
+                  function montarCalendario(ano, mes){
+                    ccCalendar.innerHTML = '';
+                    const header = document.createElement('div');
+                    header.className = 'cc-header';
+                    header.innerHTML = `
+                      <div class="cc-nav">
+                        <button id="ccPrevYear" title="Ano anterior">&laquo;</button>
+                        <button id="ccPrevMonth" title="Mês anterior">&lsaquo;</button>
+                      </div>
+                      <div><strong>${meses[mes]}</strong> ${ano}</div>
+                      <div class="cc-nav">
+                        <button id="ccNextMonth" title="Próximo mês">&rsaquo;</button>
+                        <button id="ccNextYear" title="Próximo ano">&raquo;</button>
+                      </div>
+                    `;
+                    ccCalendar.appendChild(header);
+
+                    const daysHead = document.createElement('div');
+                    daysHead.className = 'cc-days-head';
+                    daysHead.innerHTML = diasSemana.map(d=>`<div>${d}</div>`).join('');
+                    ccCalendar.appendChild(daysHead);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'cc-grid';
+                    grid.id = 'ccDias';
+                    ccCalendar.appendChild(grid);
+
+                    const primeiroDiaMes = new Date(ano, mes, 1);
+                    const ultimoDiaMes = new Date(ano, mes + 1, 0);
+                    const primeiroDiaSemana = primeiroDiaMes.getDay();
+                    const ultimoDiaMesAnterior = new Date(ano, mes, 0).getDate();
+                    const totalDiasExibidos = 42;
+
+                    for (let i = primeiroDiaSemana - 1; i >= 0; i--){
+                      const dia = ultimoDiaMesAnterior - i;
+                      const el = document.createElement('div');
+                      el.className = 'cc-day cc-other';
+                      el.textContent = dia;
+                      grid.appendChild(el);
+                    }
+
+                    for (let dia = 1; dia <= ultimoDiaMes.getDate(); dia++){
+                      const div = document.createElement('div');
+                      div.className = 'cc-day';
+                      div.dataset.dia = dia;
+                      div.dataset.mes = mes;
+                      div.dataset.ano = ano;
+                      div.textContent = dia;
+
+                      if (dia === hoje.getDate() && ano === hoje.getFullYear() && mes === hoje.getMonth()){
+                        div.classList.add('cc-today');
+                      }
+
+                      if (dataSelecionada &&
+                          dia === dataSelecionada.getDate() &&
+                          ano === dataSelecionada.getFullYear() &&
+                          mes === dataSelecionada.getMonth()){
+                        div.classList.add('cc-selected');
+                      }
+
+                      div.addEventListener('click', () => {
+                        dataSelecionada = new Date(parseInt(div.dataset.ano), parseInt(div.dataset.mes), parseInt(div.dataset.dia));
+                        anoAtual = dataSelecionada.getFullYear();
+                        mesAtual = dataSelecionada.getMonth();
+                        atualizarLabel();
+                        ccCalendar.style.display = 'none';
+                        ccOpenBtn.setAttribute('aria-expanded','false');
+                        montarCalendario(anoAtual, mesAtual);
+                      });
+
+                      grid.appendChild(div);
+                    }
+
+                    const diasPreenchidos = primeiroDiaSemana + ultimoDiaMes.getDate();
+                    const diasRestantes = totalDiasExibidos - diasPreenchidos;
+                    for (let d = 1; d <= diasRestantes; d++){
+                      const el = document.createElement('div');
+                      el.className = 'cc-day cc-other';
+                      el.textContent = d;
+                      grid.appendChild(el);
+                    }
+
+                    ccCalendar.querySelector('#ccPrevMonth').onclick = () => {
+                      mesAtual--;
+                      if (mesAtual < 0){ mesAtual = 11; anoAtual--; }
+                      montarCalendario(anoAtual, mesAtual);
+                    };
+                    ccCalendar.querySelector('#ccNextMonth').onclick = () => {
+                      mesAtual++;
+                      if (mesAtual > 11){ mesAtual = 0; anoAtual++; }
+                      montarCalendario(anoAtual, mesAtual);
+                    };
+                    ccCalendar.querySelector('#ccPrevYear').onclick = () => { anoAtual--; montarCalendario(anoAtual, mesAtual); };
+                    ccCalendar.querySelector('#ccNextYear').onclick = () => { anoAtual++; montarCalendario(anoAtual, mesAtual); };
+                  }
+
+                  function toggleCalendar(show){
+                    if (show === undefined) show = ccCalendar.style.display !== 'block';
+                    if (show){
+                      montarCalendario(anoAtual, mesAtual);
+                      ccCalendar.style.display = 'block';
+                      ccOpenBtn.setAttribute('aria-expanded','true');
+                      ccCalendar.setAttribute('aria-hidden','false');
+                    } else {
+                      ccCalendar.style.display = 'none';
+                      ccOpenBtn.setAttribute('aria-expanded','false');
+                      ccCalendar.setAttribute('aria-hidden','true');
+                    }
+                  }
+
+                  ccOpenBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleCalendar();
+                  });
+                  ccOpenBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCalendar(); }
+                  });
+
+                  ccSelectedDateEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleCalendar();
+                  });
+
+                  document.addEventListener('click', (ev) => {
+                    if (ccCalendar.style.display === 'block' && !ccWrap.contains(ev.target)){
+                      toggleCalendar(false);
+                    }
+                  });
+
+                  atualizarLabel();
+                })();
+              </script>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span>
+                Os vendedores que usam os Anúncios da Shopee estão recebendo 65% mais
+                pedidos em média. Crie anúncios <a href="#">aqui</a>
+            </span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const chartDom = document.getElementById('salesChart');
+            const chart = echarts.init(chartDom);
+
+            const STORAGE_KEY = 'salesChartData';
+
+            function getHoraBrasilia() {
+                const agora = new Date();
+                const offsetBrasilia = -3 * 60;
+                const localOffset = agora.getTimezoneOffset();
+                const brasiliaTime = new Date(agora.getTime() + (offsetBrasilia + localOffset) * 60000);
+                return brasiliaTime.getHours() + brasiliaTime.getMinutes() / 60;
+            }
+
+            function carregarDadosSalvos() {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    return JSON.parse(saved);
+                }
+                return null;
+            }
+
+            function salvarDados(dados) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dados));
+            }
+
+            function gerarDadosBase() {
+                const horaAtual = getHoraBrasilia();
+                const dadosBase = [];
+                
+                for (let hora = 0; hora <= Math.floor(horaAtual); hora++) {
+                    let vendas = 0;
+                    
+                    if (hora === 10) vendas = 55;
+                    else if (hora === 9 || hora === 11) vendas = 5;
+                    else if (hora > 6 && hora < 14 && Math.random() > 0.7) vendas = Math.random() * 10;
+                    
+                    dadosBase.push([hora, vendas]);
+                }
+                
+                if (horaAtual % 1 !== 0) {
+                    dadosBase.push([horaAtual, 0]);
+                }
+                
+                return dadosBase;
+            }
+
+            const pastData = [
+                [0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0],
+                [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0],
+                [14, 0], [15, 0], [16, 0], [17, 0], [18, 0], [19, 0], [20, 0],
+                [21, 0], [22, 0], [23, 0]
+            ];
+
+            let currentData = carregarDadosSalvos() || gerarDadosBase();
+
+            function encontrarPontoMaisProximo(data, xValue) {
+                let pontoMaisProximo = null;
+                let menorDistancia = Infinity;
+                
+                data.forEach((ponto, index) => {
+                    const distancia = Math.abs(ponto[0] - xValue);
+                    if (distancia < menorDistancia) {
+                        menorDistancia = distancia;
+                        pontoMaisProximo = { index, ponto };
+                    }
+                });
+                
+                return pontoMaisProximo;
+            }
+
+            function manipularDados(data, xValue, aumentar) {
+                const ponto = encontrarPontoMaisProximo(data, xValue);
+                if (ponto) {
+                    const novoData = [...data];
+                    const incremento = aumentar ? 5 : -5;
+                    
+                    const novoValor = Math.max(0, Math.min(100, novoData[ponto.index][1] + incremento));
+                    novoData[ponto.index][1] = novoValor;
+                    
+                    return novoData;
+                }
+                return data;
+            }
+
+            function adicionarBolinhaPulsante() {
+                const bolinhaAnterior = document.querySelector('.pulsing-dot');
+                if (bolinhaAnterior) {
+                    bolinhaAnterior.remove();
+                }
+
+                const ultimoPonto = currentData[currentData.length - 1];
+                if (!ultimoPonto) return;
+
+                const pontoPixel = chart.convertToPixel('grid', ultimoPonto);
+                if (!pontoPixel) return;
+
+                const bolinha = document.createElement('div');
+                bolinha.className = 'pulsing-dot';
+                bolinha.style.left = (pontoPixel[0] - 4) + 'px';
+                bolinha.style.top = (pontoPixel[1] - 4) + 'px';
+
+                const ring3 = document.createElement('div');
+                ring3.className = 'ring-3';
+                bolinha.appendChild(ring3);
+
+                chartDom.appendChild(bolinha);
+            }
+
+            function atualizarGrafico() {
+                const horaAtual = getHoraBrasilia();
+                
+                const option = {
+                    /* ==================== TÍTULO "TENDÊNCIA DE VENDAS" ==================== */
+                    title: {
+                        text: 'Tendência de Vendas',
+                        
+                        /* 👇 POSIÇÃO HORIZONTAL (esquerda/direita):
+                           - left: 30px; (distância da esquerda)
+                           - right: 30px; (distância da direita)
+                           - center; (centralizado)
+                           - Ex: left: 50px; (mais para direita)
+                           - Ex: left: 10px; (mais para esquerda)
+                        */
+                        left: 30,
+                        
+                        /* 👇 POSIÇÃO VERTICAL (para cima/baixo):
+                           - top: 10px; (distância do topo)
+                           - Quanto maior o número, mais para baixo
+                           - Ex: top: 5px; (mais para cima)
+                           - Ex: top: 20px; (mais para baixo)
+                        */
+                        top: 5,
+                        
+                        textStyle: {
+                            fontSize: 18, /* Tamanho da fonte (altura do texto) */
+                            fontWeight: 400,
+                            color: '#333'
+                        }
+                    },
+                    grid: {
+                        left: 70,
+                        right: 60,
+                        top: 80,
+                        bottom: 60,
+                        containLabel: false
+                    },
+                    xAxis: {
+                        type: 'value',
+                        name: 'Hora',
+                        nameLocation: 'end',
+                        nameGap: 15,
+                        nameTextStyle: {
+                            fontSize: 13,
+                            color: '#666'
+                        },
+                        min: 0,
+                        max: 23,
+                        interval: 1,
+                        axisLine: {
+                            show: false
+                        },
+                        axisTick: {
+                            show: false
+                        },
+                        axisLabel: {
+                            fontSize: 12,
+                            color: '#999',
+                            formatter: function(value) {
+                                if (value % 2 === 0) {
+                                    return value < 10 ? '0' + value : value.toString();
+                                }
+                                return '';
+                            }
+                        },
+                        splitLine: {
+                            show: true,
+                            lineStyle: {
+                                color: '#e5e5e5',
+                                width: 1,
+                                type: 'solid'
+                            }
+                        }
+                    },
+                    /* ==================== TEXTO "VENDAS(R$)" ==================== */
+                    yAxis: {
+    type: 'value',
+    name: 'Vendas(R$)',
+    nameLocation: 'end',
+
+    // Mantém o texto no topo sem mexer no eixo
+    nameGap: 25,
+
+    // Deixa o texto horizontal → agora padding funciona
+    nameRotate: 0,
+
+    nameTextStyle: {
+        fontSize: 13,
+        color: '#666',
+        align: 'left',
+        verticalAlign: 'middle',
+
+        // Agora isto move SOMENTE o texto para a direita
+        padding: [0, 0, 0, -47] 
+    },
+                        min: 0,
+                        max: 100,
+                        interval: 20,
+                        axisLine: {
+                            show: false
+                        },
+                        axisTick: {
+                            show: false
+                        },
+                        axisLabel: {
+                            fontSize: 12,
+                            color: '#999',
+                            margin: 8,
+                            align: 'right'
+                        },
+                        splitLine: {
+                            show: false
+                        }
+                    },
+                    legend: {
+                        show: false
+                    },
+                    series: [
+                        {
+                            name: 'Ontem',
+                            type: 'line',
+                            data: pastData,
+                            symbol: 'none',
+                            lineStyle: {
+                                color: '#9FE0DD',
+                                width: 2
+                            },
+                            itemStyle: {
+                                color: '#9FE0DD'
+                            },
+                            smooth: false,
+                            z: 1
+                        },
+                        {
+                            name: 'Hoje',
+                            type: 'line',
+                            data: currentData,
+                            symbol: 'none',
+                            symbolSize: 8,
+                            showSymbol: false,
+                            lineStyle: {
+                                color: '#FF4A31',
+                                width: 2,
+                                opacity: 1
+                            },
+                            itemStyle: {
+                                color: '#FF4A31',
+                                borderColor: '#fff',
+                                borderWidth: 2,
+                                opacity: 1
+                            },
+                            smooth: false,
+                            z: 2,
+                            emphasis: {
+                                focus: 'series',
+                                symbol: 'circle',
+                                symbolSize: 8,
+                                showSymbol: true,
+                                lineStyle: {
+                                    color: '#FF4A31',
+                                    width: 2,
+                                    opacity: 1
+                                },
+                                itemStyle: {
+                                    color: '#FF4A31',
+                                    borderColor: '#fff',
+                                    borderWidth: 2,
+                                    opacity: 1
+                                }
+                            }
+                        },
+                        {
+                            name: 'Área Hoje',
+                            type: 'line',
+                            data: currentData,
+                            symbol: 'none',
+                            lineStyle: {
+                                width: 0
+                            },
+                            areaStyle: {
+                                color: {
+                                    type: 'linear',
+                                    x: 0,
+                                    y: 0,
+                                    x2: 0,
+                                    y2: 1,
+                                    colorStops: [{
+                                        offset: 0, 
+                                        color: 'rgba(255, 74, 49, 0.15)'
+                                    }, {
+                                        offset: 1, 
+                                        color: 'rgba(255, 74, 49, 0.01)'
+                                    }]
+                                }
+                            },
+                            smooth: false,
+                            z: 1
+                        }
+                    ],
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function(params) {
+                            if (params.seriesName === 'Área Hoje') return '';
+                            return `Hora: ${params.value[0].toFixed(1)}h<br/>Vendas: R$ ${params.value[1]}`;
+                        }
+                    }
+                };
+
+                chart.setOption(option, { notMerge: true });
+
+                setTimeout(adicionarBolinhaPulsante, 100);
+            }
+
+            chart.getDom().addEventListener('mousedown', function(event) {
+                event.preventDefault();
+                
+                const pointInPixel = [event.offsetX, event.offsetY];
+                const pointInGrid = chart.convertFromPixel('grid', pointInPixel);
+                
+                if (pointInGrid && pointInGrid[0] >= 0 && pointInGrid[0] <= 23) {
+                    const aumentar = event.button === 2;
+                    
+                    currentData = manipularDados(currentData, pointInGrid[0], aumentar);
+                    salvarDados(currentData);
+                    atualizarGrafico();
+                }
+            });
+
+            chart.getDom().addEventListener('contextmenu', function(event) {
+                event.preventDefault();
+            });
+
+            atualizarGrafico();
+
+            setInterval(function() {
+                const horaAtual = getHoraBrasilia();
+                const ultimaHora = currentData[currentData.length - 1][0];
+                
+                if (Math.floor(horaAtual) > Math.floor(ultimaHora)) {
+                    currentData = gerarDadosBase();
+                    salvarDados(currentData);
+                    atualizarGrafico();
+                }
+            }, 60000);
+
+            window.addEventListener('resize', function() {
+                chart.resize();
+                setTimeout(adicionarBolinhaPulsante, 300);
+            });
+        });
+    </script>
