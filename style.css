@@ -1,0 +1,127 @@
+ body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .main-container {
+            width: 700px;
+            height: 500px;
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+        }
+        
+        .info-section {
+            padding: 16px 20px;
+            font-size: 11px; /* Reduzido para caber em uma linha */
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: -55px; /* Aproximado mais do gráfico */
+            white-space: nowrap; /* Garante que fique em uma linha */
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .info-section a {
+            color: #3b82f6;
+            text-decoration: underline;
+        }
+        
+        .calendar-icon {
+            width: 16px;
+            height: 16px;
+            color: #60a5fa;
+            flex-shrink: 0; /* Evita que o ícone encolha */
+        }
+
+        /* Estilos para a bolinha pulsante */
+        .pulsing-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #FF4A31;
+            z-index: 10;
+        }
+
+        .pulsing-dot::before,
+        .pulsing-dot::after,
+        .pulsing-dot .ring-3 {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid #FF4A31;
+            animation: wave 4s infinite linear;
+        }
+
+        .pulsing-dot::after {
+            animation-delay: 1.33s;
+        }
+
+        .pulsing-dot .ring-3 {
+            animation-delay: 2.66s;
+        }
+
+        @keyframes wave {
+            0% {
+                width: 8px;
+                height: 8px;
+                opacity: 0.8;
+            }
+            50% {
+                opacity: 0.4;
+            }
+            100% {
+                width: 24px;
+                height: 24px;
+                opacity: 0;
+            }
+        }
+        
+        /* Posicionamento do calendário sobreposto */
+        .calendar-overlay {
+            position: absolute;
+            right: 50px;
+            top: 32px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            background-color: #9FE0DD;
+        }
+        
+        /* Legenda do Hoje alinhada com o calendário - ajustada para não ficar em cima */
+        .hoje-legend {
+            position: absolute;
+            right: 220px; /* Afastado mais para não ficar em cima do calendário */
+            top: 42px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
