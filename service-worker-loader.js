@@ -1,4 +1,5 @@
-// Content Script completo - Tudo em um arquivo
+// Script Standalone - Shopee Liveboard Modifier
+// Pode ser executado diretamente no console do navegador ou injetado na página
 ;(() => {
   // ============================================
   // ESTILOS CSS INLINE
@@ -282,6 +283,38 @@
   `
 
   // ============================================
+  // MÓDULO DE STORAGE (localStorage)
+  // ============================================
+  const StorageManager = {
+    get(key) {
+      try {
+        const value = localStorage.getItem(`shopee_liveboard_${key}`)
+        return value ? JSON.parse(value) : null
+      } catch (e) {
+        return null
+      }
+    },
+
+    set(key, value) {
+      try {
+        localStorage.setItem(`shopee_liveboard_${key}`, JSON.stringify(value))
+        return true
+      } catch (e) {
+        console.error(`[StorageManager] Erro ao salvar ${key}:`, e)
+        return false
+      }
+    },
+
+    remove(key) {
+      try {
+        localStorage.removeItem(`shopee_liveboard_${key}`)
+      } catch (e) {
+        console.error(`[StorageManager] Erro ao remover ${key}:`, e)
+      }
+    },
+  }
+
+  // ============================================
   // MÓDULO DE CONFIGURAÇÕES
   // ============================================
   const ConfigManager = {
@@ -298,17 +331,23 @@
       vendastotais: "",
     },
 
-    async load() {
-      const settings = await window.chrome.storage.local.get([
-        "replaceChart",
-        "replaceRanking",
-        "products",
-        "liveboardValues",
-      ])
-      this.replaceChartEnabled = settings.replaceChart || false
-      this.replaceRankingEnabled = settings.replaceRanking || false
-      this.products = settings.products || []
-      this.liveboardValues = settings.liveboardValues || this.liveboardValues
+    load() {
+      const replaceChart = StorageManager.get("replaceChart")
+      const replaceRanking = StorageManager.get("replaceRanking")
+      const products = StorageManager.get("products")
+      const liveboardValues = StorageManager.get("liveboardValues")
+
+      this.replaceChartEnabled = replaceChart === true
+      this.replaceRankingEnabled = replaceRanking === true
+      this.products = Array.isArray(products) ? products : []
+      this.liveboardValues = liveboardValues && typeof liveboardValues === "object" ? liveboardValues : this.liveboardValues
+    },
+
+    save() {
+      StorageManager.set("replaceChart", this.replaceChartEnabled)
+      StorageManager.set("replaceRanking", this.replaceRankingEnabled)
+      StorageManager.set("products", this.products)
+      StorageManager.set("liveboardValues", this.liveboardValues)
     },
   }
 
@@ -320,9 +359,7 @@
     isOpen: false,
 
     init() {
-      // Injetar estilos
       this.injectStyles()
-      // Inicializar detector de 3 cliques
       this.initTripleClick()
     },
 
@@ -353,39 +390,35 @@
             this.toggle()
           }
           clickCount = 0
-        }, 500) // 500ms para os 3 cliques
+        }, 500)
       })
     },
 
-    async toggle() {
+    toggle() {
       if (this.isOpen) {
         this.close()
       } else {
-        await this.open()
+        this.open()
       }
     },
 
-    async open() {
+    open() {
       if (this.isOpen) return
 
-      await ConfigManager.load()
+      ConfigManager.load()
 
-      // Criar overlay
       const overlay = document.createElement("div")
       overlay.className = "shopee-liveboard-popup-overlay"
       overlay.id = "shopee-liveboard-popup-overlay"
 
-      // Criar container
       const container = document.createElement("div")
       container.className = "shopee-liveboard-popup-container"
 
-      // Botão fechar
       const closeBtn = document.createElement("button")
       closeBtn.className = "shopee-liveboard-popup-close"
       closeBtn.innerHTML = "×"
       closeBtn.onclick = () => this.close()
 
-      // Conteúdo
       const content = document.createElement("div")
       content.className = "shopee-liveboard-popup-content"
       content.innerHTML = this.generatePopupHTML()
@@ -394,7 +427,6 @@
       container.appendChild(content)
       overlay.appendChild(container)
 
-      // Fechar ao clicar no overlay (fora do container)
       overlay.addEventListener("click", (e) => {
         if (e.target === overlay) {
           this.close()
@@ -405,7 +437,6 @@
       this.popupElement = overlay
       this.isOpen = true
 
-      // Inicializar eventos do popup
       this.initPopupEvents()
     },
 
@@ -532,10 +563,9 @@
       const saveValuesBtn = document.getElementById("shopee-liveboard-saveValuesBtn")
       const captureValuesBtn = document.getElementById("shopee-liveboard-captureValuesBtn")
 
-      // Switch do gráfico
-      replaceChartSwitch.addEventListener("change", async (e) => {
+      replaceChartSwitch.addEventListener("change", (e) => {
         ConfigManager.replaceChartEnabled = e.target.checked
-        await window.chrome.storage.local.set({ replaceChart: e.target.checked })
+        ConfigManager.save()
 
         if (e.target.checked) {
           ChartReplacer.start()
@@ -544,10 +574,9 @@
         }
       })
 
-      // Switch do ranking
-      replaceRankingSwitch.addEventListener("change", async (e) => {
+      replaceRankingSwitch.addEventListener("change", (e) => {
         ConfigManager.replaceRankingEnabled = e.target.checked
-        await window.chrome.storage.local.set({ replaceRanking: e.target.checked })
+        ConfigManager.save()
 
         if (e.target.checked) {
           productEditor.style.display = "block"
@@ -558,11 +587,9 @@
         }
       })
 
-      // Capturar valores
       captureValuesBtn.addEventListener("click", () => {
         const values = LiveboardCapture.captureAllValues()
-        
-        // Atualizar inputs
+
         document.querySelectorAll(".shopee-liveboard-value-input").forEach((input) => {
           const key = input.dataset.key
           if (values[key]) {
@@ -571,8 +598,7 @@
         })
       })
 
-      // Salvar valores
-      saveValuesBtn.addEventListener("click", async () => {
+      saveValuesBtn.addEventListener("click", () => {
         const inputs = document.querySelectorAll(".shopee-liveboard-value-input")
         const liveboardValues = { ...ConfigManager.liveboardValues }
 
@@ -580,14 +606,13 @@
           liveboardValues[input.dataset.key] = input.value
         })
 
-        await window.chrome.storage.local.set({ liveboardValues })
         ConfigManager.liveboardValues = liveboardValues
+        ConfigManager.save()
 
         LiveboardCapture.updatePageValues(liveboardValues)
         LiveboardCapture.stopMonitoring()
         LiveboardCapture.startMonitoring()
 
-        // Feedback visual
         saveValuesBtn.textContent = "Salvo!"
         saveValuesBtn.style.background = "#4caf50"
         setTimeout(() => {
@@ -596,8 +621,7 @@
         }, 1500)
       })
 
-      // Salvar produtos
-      saveProductsBtn.addEventListener("click", async () => {
+      saveProductsBtn.addEventListener("click", () => {
         const products = []
         const productItems = document.querySelectorAll(".shopee-liveboard-product-item")
 
@@ -613,15 +637,14 @@
           })
         })
 
-        await window.chrome.storage.local.set({ products })
         ConfigManager.products = products
+        ConfigManager.save()
 
         if (ConfigManager.replaceRankingEnabled) {
           RankingReplacer.replaced = false
           setTimeout(() => RankingReplacer.replace(), 100)
         }
 
-        // Feedback visual
         saveProductsBtn.textContent = "Salvo!"
         saveProductsBtn.style.background = "#4caf50"
         setTimeout(() => {
@@ -648,26 +671,6 @@
     monitoring: false,
 
     init() {
-      // Listener para requisições do popup (mantido para compatibilidade)
-      window.chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === "captureValues") {
-          const values = this.captureAllValues()
-          sendResponse({ values })
-        }
-
-        if (request.action === "updateValues") {
-          this.updatePageValues(request.values)
-          window.chrome.storage.local.set({ liveboardValues: request.values })
-          ConfigManager.liveboardValues = request.values
-          this.stopMonitoring()
-          this.startMonitoring()
-          sendResponse({ success: true })
-        }
-
-        return true
-      })
-
-      // Capturar valores ao carregar a página
       this.applySavedValues()
     },
 
@@ -682,9 +685,8 @@
         vendastotais: this.extractSalesValue(),
       }
 
-      // Salvar valores capturados
-      window.chrome.storage.local.set({ liveboardValues: values })
       ConfigManager.liveboardValues = values
+      ConfigManager.save()
 
       return values
     },
@@ -739,6 +741,8 @@
     },
 
     updateValueByLabel(label, value) {
+      if (!value) return
+
       const labels = document.querySelectorAll("label")
 
       for (const labelElement of labels) {
@@ -764,6 +768,8 @@
     },
 
     updateSalesValue(value) {
+      if (!value) return
+
       const salesElement = document.getElementById("count") || document.querySelector(".current-sales")
 
       if (salesElement) {
@@ -783,8 +789,8 @@
     },
 
     applySavedValues() {
-      const applyValues = async () => {
-        await ConfigManager.load()
+      const applyValues = () => {
+        ConfigManager.load()
 
         if (ConfigManager.liveboardValues && Object.values(ConfigManager.liveboardValues).some((v) => v)) {
           this.updatePageValues(ConfigManager.liveboardValues)
@@ -811,8 +817,8 @@
       this.monitoring = true
       console.log("[LiveboardCapture] Iniciando monitoramento de valores")
 
-      const checkAndCorrectValues = async () => {
-        await ConfigManager.load()
+      const checkAndCorrectValues = () => {
+        ConfigManager.load()
 
         if (!ConfigManager.liveboardValues || !Object.values(ConfigManager.liveboardValues).some((v) => v)) {
           return
@@ -928,21 +934,7 @@
     observer: null,
 
     init() {
-      window.chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === "toggleChart") {
-          this.enabled = request.enabled
-          window.chrome.storage.local.set({ replaceChart: request.enabled })
-
-          if (request.enabled) {
-            this.start()
-          } else {
-            this.stop()
-          }
-
-          sendResponse({ success: true })
-        }
-        return true
-      })
+      // Não precisa de listeners, será controlado pelo popup
     },
 
     start() {
@@ -1012,8 +1004,8 @@
       })
     },
 
-    async tryReplace() {
-      await ConfigManager.load()
+    tryReplace() {
+      ConfigManager.load()
       this.enabled = ConfigManager.replaceChartEnabled
 
       if (this.enabled) {
@@ -1032,34 +1024,7 @@
     observer: null,
 
     init() {
-      window.chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === "toggleRanking") {
-          this.enabled = request.enabled
-          window.chrome.storage.local.set({ replaceRanking: request.enabled })
-
-          if (request.enabled) {
-            this.start()
-          } else {
-            this.stop()
-          }
-
-          sendResponse({ success: true })
-        }
-
-        if (request.action === "updateProducts") {
-          ConfigManager.products = request.products || []
-          window.chrome.storage.local.set({ products: ConfigManager.products })
-
-          if (this.enabled) {
-            this.replaced = false
-            setTimeout(() => this.replace(), 100)
-          }
-
-          sendResponse({ success: true })
-        }
-
-        return true
-      })
+      // Não precisa de listeners, será controlado pelo popup
     },
 
     start() {
@@ -1188,8 +1153,8 @@
       })
     },
 
-    async tryReplace() {
-      await ConfigManager.load()
+    tryReplace() {
+      ConfigManager.load()
       this.enabled = ConfigManager.replaceRankingEnabled
 
       if (this.enabled) {
@@ -1202,8 +1167,8 @@
   // ============================================
   // INICIALIZAÇÃO
   // ============================================
-  async function init() {
-    await ConfigManager.load()
+  function init() {
+    ConfigManager.load()
 
     ChartReplacer.enabled = ConfigManager.replaceChartEnabled
     RankingReplacer.enabled = ConfigManager.replaceRankingEnabled
@@ -1230,6 +1195,10 @@
     setTimeout(tryReplace, 2000)
   }
 
-  init()
+  // Iniciar quando o script for carregado
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init)
+  } else {
+    init()
+  }
 })()
-
